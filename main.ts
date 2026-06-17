@@ -8,7 +8,7 @@ const API_SECRET = Deno.env.get("API_SECRET");
 
 function isAuthorized(req: Request): boolean {
   if (!API_SECRET) return true;
-  return req.headers.get("Authorization") === `ApiKey-v1: ${API_SECRET}`;
+  return req.headers.get("Authorization") === `ApiKey-v1 ${API_SECRET}`;
 }
 
 const kv = await Deno.openKv();
