@@ -1,0 +1,147 @@
+openapi: 3.1.0
+
+info:
+  title: Honey, I'm Back!
+  description: |
+    Tracks which family members are currently at home.
+
+    **Authentication**
+    When `API_SECRET` is configured on the server, every request must carry:
+    ```
+    Authorization: ApiKey-v1 <your-secret>
+    ```
+    When the variable is absent the API is open (useful on a trusted local network).
+
+    **Real-time updates**
+    Subscribe to the WebSocket endpoint described in `asyncapi.yaml` to receive
+    a pushed list whenever presence changes, instead of polling `/status`.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /status:
+    get:
+      summary: List who is home
+      description: Returns the names of all family members currently at home.
+      operationId: getStatus
+      responses:
+        "200":
+          description: Current presence list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AtHomeList"
+              example: ["falk", "leni"]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /coming-home/{name}:
+    post:
+      summary: Announce arrival
+      description: Marks a family member as home and broadcasts the updated list to WebSocket subscribers.
+      operationId: comingHome
+      parameters:
+        - $ref: "#/components/parameters/MemberName"
+      responses:
+        "200":
+          description: Member marked as home
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresenceUpdate"
+              example:
+                member: falk
+                home: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/UnknownMember"
+
+  /leaving/{name}:
+    post:
+      summary: Announce departure
+      description: Marks a family member as away and broadcasts the updated list to WebSocket subscribers.
+      operationId: leaving
+      parameters:
+        - $ref: "#/components/parameters/MemberName"
+      responses:
+        "200":
+          description: Member marked as away
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresenceUpdate"
+              example:
+                member: falk
+                home: false
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/UnknownMember"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: "Value format: `ApiKey-v1 <your-secret>`. Only enforced when `API_SECRET` is set on the server."
+
+  parameters:
+    MemberName:
+      name: name
+      in: path
+      required: true
+      description: Family member identifier — must be one of the names in the server's `FAMILY_MEMBERS` list.
+      schema:
+        type: string
+        example: falk
+
+  schemas:
+    AtHomeList:
+      type: array
+      items:
+        type: string
+      description: Names of family members currently at home.
+      example: ["falk", "leni"]
+
+    PresenceUpdate:
+      type: object
+      required: [member, home]
+      properties:
+        member:
+          type: string
+          description: The family member whose status changed.
+          example: falk
+        home:
+          type: boolean
+          description: True if the member is now home, false if they left.
+          example: true
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid `Authorization` header.
+      content:
+        text/plain:
+          schema:
+            type: string
+          example: Unauthorized
+
+    UnknownMember:
+      description: The name in the path is not in the server's `FAMILY_MEMBERS` list.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error:
+                type: string
+          example:
+            error: unknown family member

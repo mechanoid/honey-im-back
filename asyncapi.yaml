@@ -1,0 +1,68 @@
+asyncapi: 2.6.0
+
+info:
+  title: Honey, I'm Back! — Real-time Presence
+  description: |
+    WebSocket channel that streams live presence updates to connected clients.
+
+    **Connect** to `/ws` to receive the full current presence list immediately.
+    The server will then push a fresh list every time any family member arrives
+    or leaves (triggered via the REST endpoints documented in `openapi.yaml`).
+
+    The client never sends messages — this is a server-push-only channel.
+
+    **Authentication**
+    When `API_SECRET` is configured on the server, the HTTP upgrade request
+    must carry the same header as the REST API:
+    ```
+    Authorization: ApiKey-v1 <your-secret>
+    ```
+    A missing or wrong header results in a `401` response and no upgrade.
+  version: 1.0.0
+
+servers:
+  local:
+    url: ws://localhost:8000
+    protocol: ws
+    description: Local development
+    security:
+      - ApiKeyAuth: []
+
+channels:
+  /ws:
+    description: |
+      Subscribe to receive presence updates. The server sends the complete
+      at-home list in two situations:
+      - once immediately after the connection is established
+      - every time a member's presence status changes
+    subscribe:
+      summary: Receive current presence list
+      operationId: receivePresenceList
+      message:
+        $ref: "#/components/messages/AtHomeList"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: httpApiKey
+      name: Authorization
+      in: header
+      description: "Value format: `ApiKey-v1 <your-secret>`. Only enforced when `API_SECRET` is set on the server."
+
+  messages:
+    AtHomeList:
+      name: AtHomeList
+      title: Members currently at home
+      summary: Full list of family members who are currently home.
+      description: |
+        Sent by the server on connect and after every presence change.
+        Always reflects the complete current state — not a delta.
+      contentType: application/json
+      payload:
+        type: array
+        items:
+          type: string
+        description: Names of family members currently at home.
+        examples:
+          - ["falk", "leni"]
+          - []
