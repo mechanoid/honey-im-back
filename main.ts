@@ -4,6 +4,13 @@ const FAMILY_MEMBERS = (Deno.env.get("FAMILY_MEMBERS") ?? "").split(",").map(
   (s) => s.trim(),
 ).filter(Boolean);
 
+const API_SECRET = Deno.env.get("API_SECRET");
+
+function isAuthorized(req: Request): boolean {
+  if (!API_SECRET) return true;
+  return req.headers.get("Authorization") === `ApiKey-v1: ${API_SECRET}`;
+}
+
 const kv = await Deno.openKv();
 const clients = new Set<WebSocket>();
 
@@ -39,6 +46,10 @@ function json(data: unknown, status = 200): Response {
 }
 
 Deno.serve(async (req) => {
+  if (!isAuthorized(req)) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   const { pathname } = new URL(req.url);
 
   if (req.method === "GET" && pathname === "/status") {
