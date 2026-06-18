@@ -19,6 +19,10 @@ function isWsAuthorized(url: URL): boolean {
   return url.searchParams.get("token") === API_SECRET;
 }
 
+function log(...args: unknown[]): void {
+  console.log(new Date().toISOString(), ...args);
+}
+
 const redisUrl = new URL(Deno.env.get("REDIS_URL") ?? "redis://127.0.0.1:6379");
 const redis = await connect({
   hostname: redisUrl.hostname,
@@ -42,9 +46,14 @@ async function atHome(): Promise<string[]> {
 async function broadcast(): Promise<void> {
   const list = await atHome();
   const msg = JSON.stringify(list);
+  let sent = 0;
   for (const ws of clients) {
-    if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(msg);
+      sent++;
+    }
   }
+  log(`WS broadcast ${msg} -> ${sent} client(s)`);
 }
 
 async function setHome(name: string, home: boolean): Promise<boolean> {
@@ -65,30 +74,40 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-Deno.serve(async (req) => {
-  const url = new URL(req.url);
-  const { pathname } = url;
-
-  // The WebSocket upgrade authenticates via query-param token; every other
-  // endpoint uses the Authorization header.
-  if (req.method === "GET" && pathname === "/ws") {
-    if (!isWsAuthorized(url)) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-    const { socket, response } = Deno.upgradeWebSocket(req);
-    socket.onopen = async () => {
-      clients.add(socket);
-      socket.send(JSON.stringify(await atHome()));
-    };
-    socket.onmessage = (e) => {
-      // Keepalive: a consumer sends "ping" to stop the host from idling
-      // the service out; reply "pong" so the connection stays active.
-      if (e.data === "ping") socket.send("pong");
-    };
-    socket.onclose = () => clients.delete(socket);
-    socket.onerror = () => clients.delete(socket);
-    return response;
+function handleWebSocket(req: Request, url: URL): Response {
+  if (!isWsAuthorized(url)) {
+    log(`WS ${url.pathname} -> 401`);
+    return new Response("Unauthorized", { status: 401 });
   }
+  const { socket, response } = Deno.upgradeWebSocket(req);
+  socket.onopen = async () => {
+    clients.add(socket);
+    const msg = JSON.stringify(await atHome());
+    socket.send(msg);
+    log(`WS open (${clients.size} client(s)); sent ${msg}`);
+  };
+  socket.onmessage = (e) => {
+    log(`WS recv ${JSON.stringify(e.data)}`);
+    // Keepalive: a consumer sends "ping" to stop the host from idling
+    // the service out; reply "pong" so the connection stays active.
+    if (e.data === "ping") {
+      socket.send("pong");
+      log("WS send pong");
+    }
+  };
+  socket.onclose = () => {
+    clients.delete(socket);
+    log(`WS close (${clients.size} client(s))`);
+  };
+  socket.onerror = () => {
+    clients.delete(socket);
+    log("WS error");
+  };
+  return response;
+}
+
+async function handleRest(req: Request, url: URL): Promise<Response> {
+  const { pathname } = url;
 
   // Header-based auth for the REST endpoints.
   if (!isAuthorized(req)) {
@@ -118,4 +137,18 @@ Deno.serve(async (req) => {
   }
 
   return new Response("Not Found", { status: 404 });
+}
+
+Deno.serve(async (req) => {
+  const url = new URL(req.url);
+
+  // The WebSocket upgrade authenticates via query-param token; every other
+  // endpoint uses the Authorization header.
+  if (req.method === "GET" && url.pathname === "/ws") {
+    return handleWebSocket(req, url);
+  }
+
+  const res = await handleRest(req, url);
+  log(`${req.method} ${url.pathname} -> ${res.status}`);
+  return res;
 });
