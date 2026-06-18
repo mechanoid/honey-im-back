@@ -1,11 +1,44 @@
 {
   "version": "5",
   "specifiers": {
-    "jsr:@std/dotenv@*": "0.225.7"
+    "jsr:@db/redis@*": "0.41.2",
+    "jsr:@db/redis@~0.41.2": "0.41.2",
+    "jsr:@std/async@1": "1.4.0",
+    "jsr:@std/bytes@1": "1.0.6",
+    "jsr:@std/bytes@^1.0.2-rc.3": "1.0.6",
+    "jsr:@std/dotenv@*": "0.225.7",
+    "jsr:@std/dotenv@~0.225.7": "0.225.7",
+    "jsr:@std/io@0.224.5": "0.224.5"
   },
   "jsr": {
+    "@db/redis@0.41.2": {
+      "integrity": "d96d10020c589830f0e4b59222260b75ffb423ff44b795b4b4436adca9352a6a",
+      "dependencies": [
+        "jsr:@std/async",
+        "jsr:@std/bytes@1",
+        "jsr:@std/io"
+      ]
+    },
+    "@std/async@1.4.0": {
+      "integrity": "4d70b008634f571cff9b554090d628c76141c32613aae0ff283fd5fa23d0c379"
+    },
+    "@std/bytes@1.0.6": {
+      "integrity": "f6ac6adbd8ccd99314045f5703e23af0a68d7f7e58364b47d2c7f408aeb5820a"
+    },
     "@std/dotenv@0.225.7": {
       "integrity": "11d8db03ca4ad5aba9eba809f2e8058b2a4f320b7b09fea4b360e162928329e3"
+    },
+    "@std/io@0.224.5": {
+      "integrity": "cb84fe655d1273fca94efcff411465027a8b0b4225203f19d6ee98d9c8920a2d",
+      "dependencies": [
+        "jsr:@std/bytes@^1.0.2-rc.3"
+      ]
     }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@db/redis@~0.41.2",
+      "jsr:@std/dotenv@~0.225.7"
+    ]
   }
 }

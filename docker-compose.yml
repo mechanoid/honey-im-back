@@ -1,0 +1,27 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      FAMILY_MEMBERS: falk,leni,sarah,paul
+      REDIS_URL: redis://redis:6379
+      # API_SECRET: my-little-secret
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    # Persist data to a named volume so presence survives restarts.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis-data:

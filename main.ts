@@ -1,4 +1,5 @@
-import "jsr:@std/dotenv/load";
+import "@std/dotenv/load";
+import { connect } from "@db/redis";
 
 const FAMILY_MEMBERS = (Deno.env.get("FAMILY_MEMBERS") ?? "").split(",").map(
   (s) => s.trim(),
@@ -11,16 +12,22 @@ function isAuthorized(req: Request): boolean {
   return req.headers.get("Authorization") === `ApiKey-v1 ${API_SECRET}`;
 }
 
-const kv = await Deno.openKv(Deno.env.get("DENO_KV_PATH"));
+const redisUrl = new URL(Deno.env.get("REDIS_URL") ?? "redis://127.0.0.1:6379");
+const redis = await connect({
+  hostname: redisUrl.hostname,
+  port: Number(redisUrl.port) || 6379,
+  password: redisUrl.password || undefined,
+  db: redisUrl.pathname.length > 1 ? Number(redisUrl.pathname.slice(1)) : undefined,
+});
+
+// Redis set holding the names of members currently at home.
+const HOME_KEY = "home";
 const clients = new Set<WebSocket>();
 
 async function atHome(): Promise<string[]> {
-  const result: string[] = [];
-  for (const member of FAMILY_MEMBERS) {
-    const entry = await kv.get<boolean>(["home", member]);
-    if (entry.value === true) result.push(member);
-  }
-  return result;
+  const members = await redis.smembers(HOME_KEY);
+  // Preserve FAMILY_MEMBERS order and drop any stale names no longer configured.
+  return FAMILY_MEMBERS.filter((m) => members.includes(m));
 }
 
 async function broadcast(): Promise<void> {
@@ -33,7 +40,11 @@ async function broadcast(): Promise<void> {
 
 async function setHome(name: string, home: boolean): Promise<boolean> {
   if (!FAMILY_MEMBERS.includes(name)) return false;
-  await kv.set(["home", name], home);
+  if (home) {
+    await redis.sadd(HOME_KEY, name);
+  } else {
+    await redis.srem(HOME_KEY, name);
+  }
   await broadcast();
   return true;
 }
