@@ -11,7 +11,7 @@ function isAuthorized(req: Request): boolean {
   return req.headers.get("Authorization") === `ApiKey-v1 ${API_SECRET}`;
 }
 
-const kv = await Deno.openKv();
+const kv = await Deno.openKv(Deno.env.get("DENO_KV_PATH"));
 const clients = new Set<WebSocket>();
 
 async function atHome(): Promise<string[]> {
