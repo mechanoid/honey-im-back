@@ -14,4 +14,4 @@ USER deno
 EXPOSE 8000
 
 # Permissions come from the "app" set defined in deno.jsonc.
-CMD ["run", "-P=app", "main.ts"]
+CMD ["run", "-P=run", "main.ts"]
