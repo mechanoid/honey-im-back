@@ -6,6 +6,9 @@
   "tasks": {
     "dev": "deno run -P=run main.ts",
     "start": "deno run -P=run main.ts",
+    "status": "deno run -P=run client.ts status",
+    "coming-home": "deno run -P=run client.ts coming-home",
+    "leaving": "deno run -P=run client.ts leaving",
   },
   "permissions": {
     "run": {

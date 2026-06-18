@@ -9,15 +9,20 @@ info:
     The server will then push a fresh list every time any family member arrives
     or leaves (triggered via the REST endpoints documented in `openapi.yaml`).
 
-    The client never sends messages — this is a server-push-only channel.
+    **Keepalive**
+    The client may send the text message `ping` at any time; the server replies
+    with the text message `pong`. Send a ping periodically (e.g. every 30–60s)
+    to keep the connection — and the always-on service — from being idled out
+    by the hosting provider.
 
     **Authentication**
-    When `API_SECRET` is configured on the server, the HTTP upgrade request
-    must carry the same header as the REST API:
+    When `API_SECRET` is configured on the server, the connection URL must
+    include the secret as a `token` query parameter (WebSocket clients can't
+    set request headers, unlike the REST API):
     ```
-    Authorization: ApiKey-v1 <your-secret>
+    wss://<host>/ws?token=<your-secret>
     ```
-    A missing or wrong header results in a `401` response and no upgrade.
+    A missing or wrong token results in a `401` response and no upgrade.
   version: 1.0.0
 
 servers:
@@ -26,28 +31,33 @@ servers:
     protocol: ws
     description: Local development
     security:
-      - ApiKeyAuth: []
+      - TokenQueryParam: []
 
 channels:
   /ws:
     description: |
-      Subscribe to receive presence updates. The server sends the complete
-      at-home list in two situations:
-      - once immediately after the connection is established
-      - every time a member's presence status changes
+      Bidirectional channel. The server pushes presence updates; the client
+      may send keepalive pings.
     subscribe:
-      summary: Receive current presence list
-      operationId: receivePresenceList
+      summary: Messages received from the server
+      operationId: receiveFromServer
       message:
-        $ref: "#/components/messages/AtHomeList"
+        oneOf:
+          - $ref: "#/components/messages/AtHomeList"
+          - $ref: "#/components/messages/Pong"
+    publish:
+      summary: Messages sent to the server
+      operationId: sendToServer
+      message:
+        $ref: "#/components/messages/Ping"
 
 components:
   securitySchemes:
-    ApiKeyAuth:
+    TokenQueryParam:
       type: httpApiKey
-      name: Authorization
-      in: header
-      description: "Value format: `ApiKey-v1 <your-secret>`. Only enforced when `API_SECRET` is set on the server."
+      name: token
+      in: query
+      description: "Pass the server's `API_SECRET` as `?token=<your-secret>` on the connection URL. Only enforced when `API_SECRET` is set on the server."
 
   messages:
     AtHomeList:
@@ -66,3 +76,21 @@ components:
         examples:
           - ["falk", "leni"]
           - []
+
+    Ping:
+      name: Ping
+      title: Keepalive ping
+      summary: Sent by the client to keep the connection alive.
+      contentType: text/plain
+      payload:
+        type: string
+        const: ping
+
+    Pong:
+      name: Pong
+      title: Keepalive pong
+      summary: Server's reply to a ping.
+      contentType: text/plain
+      payload:
+        type: string
+        const: pong
