@@ -13,6 +13,5 @@ USER deno
 
 EXPOSE 8000
 
-# State lives in Redis (configured via REDIS_URL), so no local volume
-# or write permission is needed. --allow-read covers the optional .env file.
-CMD ["run", "--allow-net", "--allow-env", "--allow-read", "main.ts"]
+# Permissions come from the "app" set defined in deno.jsonc.
+CMD ["run", "-P=app", "main.ts"]

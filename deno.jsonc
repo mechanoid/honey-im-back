@@ -1,10 +1,17 @@
 {
   "imports": {
     "@db/redis": "jsr:@db/redis@^0.41.2",
-    "@std/dotenv": "jsr:@std/dotenv@^0.225.7"
+    "@std/dotenv": "jsr:@std/dotenv@^0.225.7",
   },
   "tasks": {
-    "dev": "deno run --allow-net --allow-env --allow-read=.env main.ts",
-    "start": "deno run --allow-net --allow-env --allow-read=.env main.ts"
-  }
+    "dev": "deno run -P=run main.ts",
+    "start": "deno run -P=run main.ts",
+  },
+  "permissions": {
+    "run": {
+      "net": true,
+      "env": true,
+      "read": [".env"],
+    },
+  },
 }
